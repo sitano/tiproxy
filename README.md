@@ -20,3 +20,12 @@ when there are active incoming connections.
     terminal Y: $ echo HELLO | nc -t 127.0.0.1 4000
     terminal Z: $ telnet 127.0.0.1 4000
     terminal Z: > blah [ press ENTER ]
+
+### TiDB with docker-compose
+
+    $ go build
+    $ cp tiproxy docker/bin
+    $ docker build -t tiproxy:latest ./docker
+    $ docker-compose -f ./docker/docker-compose.yml up 
+    $ mysql --host 127.0.0.1 --port 4000 -u root
+    $ mysql --host 127.0.0.1 --port 4000 -u root

@@ -1,2 +1,4 @@
-/tiproxy
+tiproxy
 .idea
+docker/data
+docker/logs
