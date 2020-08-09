@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
+	"os/signal"
 	"runtime"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -243,11 +246,18 @@ func waitReady(cfg *ProcessPoolConfig) error {
 	return context.DeadlineExceeded
 }
 
-// monitor monitors resource activity and shutdowns it if it is idle
-// XXX: handle unix.SIGCHLD
+// monitor monitors resource activity and shutdowns it if it is idle or exit
 func (n *pool) monitor(pid int) {
 	log.Printf("monitor: monitoring [%d]", pid)
 
+	child := make(chan os.Signal, 1)
+	signal.Notify(child, syscall.SIGCHLD)
+	defer signal.Stop(child)
+
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+iter:
 	for {
 		n.m.Lock()
 
@@ -271,7 +281,39 @@ func (n *pool) monitor(pid int) {
 
 		n.m.Unlock()
 
-		time.Sleep(time.Second)
+		select {
+		// timer
+		case <- ticker.C:
+		// child process signals
+		case <- child:
+			var status syscall.WaitStatus
+			_, err := syscall.Wait4(pid, &status, syscall.WNOHANG, nil)
+			log.Println("monitor: got signal from [", pid, "]:", status)
+			if err != nil {
+				log.Println("monitor: wait4 error:", err)
+				continue
+			}
+
+			// shutdown
+			n.m.Lock()
+
+			// assert
+			if n.res.PID() != pid {
+				log.Printf("shutdown: observed unknown pid. expected %d, got %d. exit.", pid, n.res.PID())
+				n.m.Unlock()
+				return
+			}
+
+			// assert
+			if n.state != StateOpen {
+				log.Fatalln("monitor: unexpected state before shutdown:", n.state)
+			}
+
+			n.state = StateShutdown
+			n.m.Unlock()
+
+			break iter
+		}
 	}
 
 	// shutdown resource
