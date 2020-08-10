@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -121,7 +122,9 @@ func spawnPool(state int) *pool {
 		state: state,
 		last:  time.Now(),
 		res: nil,
-		cfg: ProcessPoolConfig{},
+		cfg: ProcessPoolConfig{
+			Ctx: context.Background(),
+		},
 	}
 
 	p.c = sync.NewCond(&p.m)
@@ -130,11 +133,16 @@ func spawnPool(state int) *pool {
 }
 
 func waitReserve(p *pool) {
-	for {
+	wait(func() bool {
 		p.m.Lock()
-		o := p.open
-		p.m.Unlock()
-		if o > 0 {
+		defer p.m.Unlock()
+		return p.open > 0
+	})
+}
+
+func wait(f func() bool) {
+	for {
+		if f() {
 			break
 		}
 		time.Sleep(time.Microsecond)

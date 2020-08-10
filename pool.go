@@ -72,7 +72,9 @@ func NewServicePool(config ProcessPoolConfig) (Pool, error) {
 
 	p.c = sync.NewCond(&p.m)
 
-	go p.stats()
+	if config.Stats {
+		go p.stats()
+	}
 
 	log.Printf("pool configuration: %+v", config)
 
@@ -90,6 +92,9 @@ type ProcessPoolConfig struct {
 	IdleTimeout time.Duration
 	StartTimeout time.Duration
 	ReadyHealthCheckInterval time.Duration
+
+	Stats bool
+	StatsInterval time.Duration
 }
 
 // Get acquires a new resource that must be returned later
@@ -365,7 +370,7 @@ func (n *pool) stats() {
 			", goroutines =", runtime.NumGoroutine())
 		n.m.Unlock()
 
-		time.Sleep(15*time.Second)
+		time.Sleep(n.cfg.StatsInterval)
 	}
 }
 

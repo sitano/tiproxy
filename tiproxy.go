@@ -62,6 +62,8 @@ func config() ProcessPoolConfig {
 		IdleTimeout:  *idle,
 		StartTimeout: *start,
 		ReadyHealthCheckInterval: *ready,
+		Stats: true,
+		StatsInterval: 10*time.Second,
 	}
 }
 
