@@ -151,16 +151,15 @@ iter:
 		goto iter
 
 	case StateClosed:
-		n.state = StateStarting
-		go n.start()
-
-		// wait for the resource to start
-		n.c.Wait()
-
-		if n.state != StateOpen {
+		proc, err := n.start()
+		if err != nil {
+			n.state = StateClosed
 			n.open--
-			return ErrUnavailableRetry
+			return err
 		}
+
+		n.state = StateOpen
+		n.res = proc
 
 	default:
 		log.Fatalln("unknown pool state:", n.state)
@@ -190,44 +189,31 @@ func (n *pool) broadcast(state int) {
 	n.c.Broadcast()
 }
 
-// start spawns a resource and switches the FSM state
-func (n *pool) start() {
-	defer func() {
-		if err := recover(); err != nil {
-			log.Println(fmt.Errorf("recover: start: new process: %v", err))
-			n.broadcast(StateClosed)
-		}
-	}()
-
+// start spawns a resource and switches the FSM state.
+// call it under the lock.
+func (n *pool) start() (Process, error) {
 	proc, err := NewProcess(n.cfg.Ctx, n.cfg.WorkDir, n.cfg.Exec, n.cfg.Args...)
 	if err != nil {
-		log.Println("start: new process:", err)
-		n.broadcast(StateClosed)
-		return
+		return nil, fmt.Errorf("start: new process: %w", err)
 	}
 
 	if err := proc.Start(); err != nil {
-		log.Println("start: process:", err)
-		n.broadcast(StateClosed)
-		return
+		return nil, fmt.Errorf("start: process: %w", err)
 	}
 
 	if err := waitReady(&n.cfg); err != nil {
 		if err2 := proc.Stop(); err2 != nil {
 			log.Println("start: shutdown process that did not start in time:", err2)
 		}
-		log.Println("start: process did not start:", err)
-		n.broadcast(StateClosed)
-		return
-	}
 
-	n.m.Lock()
-	n.res = proc
-	n.m.Unlock()
+		fmt.Errorf("start: process did not start: %w", err)
+
+		return nil, ErrUnavailableRetry
+	}
 
 	go n.monitor(proc.PID())
 
-	n.broadcast(StateOpen)
+	return proc, nil
 }
 
 func waitReady(cfg *ProcessPoolConfig) error {

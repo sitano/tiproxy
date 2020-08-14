@@ -38,9 +38,7 @@ func TestPoolReserve(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			// expected state transition: shutdown -> closed -> starting -> closed
-			if err := p.reserve(); err != ErrUnavailableRetry {
-				t.Error(err)
-			}
+			_ = p.reserve()
 			p.m.Lock()
 			if p.open != 0 || p.state != StateClosed {
 				t.Error("reserve must be unsuccessful due to failed start")

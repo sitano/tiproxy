@@ -20,15 +20,15 @@ func TestLongRun(t *testing.T) {
 	}
 
 	p, err := NewServicePool(ProcessPoolConfig{
-		Ctx:          context.Background(),
-		Exec:         "/usr/sbin/ncat",
-		Args:         []string{"-l", "-k", "-p", "3000", "-4", "-v", "--broker"},
-		Dest:         dest,
-		IdleTimeout:  0,
-		StartTimeout: 200*time.Millisecond,
+		Ctx:                      context.Background(),
+		Exec:                     "/usr/sbin/ncat",
+		Args:                     []string{"-l", "-k", "-p", "3000", "-4", "-v", "--broker"},
+		Dest:                     dest,
+		IdleTimeout:              0,
+		StartTimeout:             200 * time.Millisecond,
 		ReadyHealthCheckInterval: time.Millisecond,
-		Stats: true,
-		StatsInterval: time.Second,
+		Stats:                    true,
+		StatsInterval:            time.Second,
 	})
 	if err != nil {
 		t.Fatal("service pool init:", err)
@@ -38,7 +38,7 @@ func TestLongRun(t *testing.T) {
 		var ptr = p.(*pool)
 		for {
 			spawn := rand.Intn(10)
-			for i := 0; i < spawn; i ++ {
+			for i := 0; i < spawn; i++ {
 				go func() {
 					conn, err := net.Dial("tcp", "127.0.0.1:4000")
 					if err != nil {
